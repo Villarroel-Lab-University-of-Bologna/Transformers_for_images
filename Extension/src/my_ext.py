@@ -11,4 +11,3 @@ main_category = knext.category(
 
 
 from nodes import vit_learner
-#from nodes import vit_predictor
