@@ -2,6 +2,7 @@ import knime.extension as knext
 import logging
 import pickle
 from sklearn.preprocessing import OneHotEncoder
+from sklearn.preprocessing import LabelEncoder
 import pandas as pd
 import torch
 from torch.nn.functional import softmax
@@ -92,6 +93,11 @@ def is_string(column: knext.Column) -> bool:
     return column.ktype == knext.string()
 
 
+def is_nominal(column):
+    
+    # Filter nominal columns
+    return column.ktype == knext.string() or column.ktype == knext.bool_()
+
 def is_numeric(column: knext.Column) -> bool:
     """
     Checks if column is numeric e.g. int, long or double.
@@ -168,6 +174,7 @@ def get_prediction_column_name(prediction_column, target_schema):
     return y_pred
 
 def concatenate_predictions_with_input_table(df, dfx_predictions):
+    
     # Concatenate prediction columns with features dataframe
     dfx_predictions.index = df.index
     df = pd.concat([df, dfx_predictions], axis=1)
@@ -231,22 +238,16 @@ class ClassificationModelObject(knext.PortObject):
         spec: ClassificationModelObjectSpec,
         model,
         label_enc,
-        one_hot_encoder,
-        missing_value_handling_setting,
     ) -> None:
         super().__init__(spec)
         self._model = model
         self._label_enc = label_enc
-        self._one_hot_encoder = one_hot_encoder
-        self._missing_value_handling_setting = missing_value_handling_setting
 
     def serialize(self) -> bytes:
         return pickle.dumps(
             (
                 self._model,
                 self._label_enc,
-                self._one_hot_encoder,
-                self._missing_value_handling_setting,
             )
         )
 
@@ -255,12 +256,9 @@ class ClassificationModelObject(knext.PortObject):
         return super().spec
 
     @property
-    def one_hot_encoder(self) -> OneHotEncoder:
-        return self._one_hot_encoder
+    def one_hot_encoder(self) -> LabelEncoder:
+        return self._label_enc
 
-    @property
-    def handle_missing_values(self) -> knext.EnumParameter:
-        return self._missing_value_handling_setting
 
     @classmethod
     def deserialize(
@@ -269,11 +267,9 @@ class ClassificationModelObject(knext.PortObject):
         (
             model,
             label_encoder,
-            one_hot_encoder,
-            missing_value_handling_setting,
         ) = pickle.loads(data)
         return cls(
-            spec, model, label_encoder, one_hot_encoder, missing_value_handling_setting
+            spec, model, label_encoder
         )
 
     def decode_target_values(self, predicted_column):
@@ -287,15 +283,16 @@ class ClassificationModelObject(knext.PortObject):
         return decoded_column
 
 
-    def get_class_probability_column_names(self, predicted_column_name):
+    def get_class_probability_column_names(self, predicted_column):
 
+        # f"P({self.label_column}_pred={column_name})"
         if self._label_enc is None:
             raise ValueError("Label encoder is not set. Ensure the encoder is passed during training.")
 
         # Generate column names for each class label
         class_probability_column_names = []
         for class_label in self._label_enc.classes_:
-            column_name = f"Probability_Label_{class_label}"
+            column_name = f"P({predicted_column}={class_label})"
             class_probability_column_names.append(column_name)
 
         return class_probability_column_names
