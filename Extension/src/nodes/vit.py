@@ -71,6 +71,7 @@ class VisionTransformerLearnerNode:
         label="Label Column",
         description="Select the column containing class labels.",
         port_index=0,
+        column_filter=kutil.is_nominal,
     )
 
     num_epochs = knext.IntParameter(
@@ -108,60 +109,59 @@ class VisionTransformerLearnerNode:
         validation_schema: knext.Schema,
     ):
 
+        return self._create_spec(
+            training_schema, validation_schema, class_probability_schema=None
+        )
 
-        return self._create_spec(training_schema, validation_schema, class_probability_schema = None)
-
-
-    def _create_spec(        
+    def _create_spec(
         self,
         training_schema: knext.Schema,
         validation_schema: knext.Schema,
         class_probability_schema: knext.Schema,
-        ):
+    ):
 
-        image_column = [
-                (c.name, c.ktype) for c in training_schema if kutil.is_png(c)
-        ]
+        image_column = [(c.name, c.ktype) for c in training_schema if kutil.is_png(c)]
 
-
-       # Check if feature column(s) have been specified
+        # Check if image column have been specified
         if not image_column:
             raise knext.InvalidParametersError(
-                """Image column has not been specified."""
+                "PNG image type column in missing in the input table."
             )
 
-        
+        # Preset the left most PNG image column from the input table.
+        if self.image_column is None:
+            self.image_column = image_column[-1][0]
+
+        # Populate list of target columns
         label_column = [
             (c.name, c.ktype) for c in training_schema if kutil.is_nominal(c)
         ]
 
-        # Check if the target column have been specified
-        if len(label_column) == 0:
-            raise knext.InvalidParametersError("Target column is missing.")        
+        # Check if the target column is available
+        if not label_column:
+            raise knext.InvalidParametersError("No compatible target column available.")
+
+        # Preset the left most nominal column as target column from the input table.
+        if self.label_column is None:
+            self.label_column = label_column[-1][0]
 
         # Create schema from the target column
-        target_schema = knext.Schema.from_columns(
-            [c for c in training_schema if c.name == label_column[0][0]]
-        )
+        target_schema = training_schema[[self.label_column]]
 
-        # Create schema from feature columns
-        feature_schema = knext.Schema.from_columns(
-            [c for c in training_schema if c.name == image_column[0][0]]
-        )
+        # Create image column schema from the selected image column
+        image_schema = training_schema[[self.image_column]]
 
         # Check if the option for predicting class probabilities is enabled
         if class_probability_schema is None:
             class_probability_schema = knext.Schema.from_columns("")
 
-        LOGGER.warning(f"Input Schema: {training_schema}")
-        LOGGER.warning(f"Feature Schema: {feature_schema}")
-        LOGGER.warning(f"Target Schema: {target_schema}")
+        # TODO: add a check that the validation schema must contain the same columns as selected for training
 
-        return kutil.ClassificationModelObjectSpec(
-            feature_schema,
+        return kutil.ViTClassificationModelObjectSpec(
+            image_schema,
             target_schema,
             class_probability_schema,
-            model_choice=self.model_choice, #TODO make this as path to pre_trained model, either as local path or huggingface.co endpoint
+            model_choice=self.model_choice,  # TODO make this as path to pre_trained model, either as local path or huggingface.co endpoint
         )
 
     def execute(
@@ -171,17 +171,15 @@ class VisionTransformerLearnerNode:
         df_val = validation_table.to_pandas()
 
         # Extract feature and label columns
-        feature_columns = [self.image_column]
+        image_column = self.image_column
         label_column = self.label_column
-
-        LOGGER.warning(feature_columns[0])
 
         class_probability_schema = None
 
         # Extract images and labels
-        train_images = df_train[feature_columns[0]]
+        train_images = df_train[image_column]
         train_labels = df_train[label_column]
-        val_images = df_val[feature_columns[0]]
+        val_images = df_val[image_column]
         val_labels = df_val[label_column]
 
         # Initialize a label encoder and encode labels
@@ -207,7 +205,6 @@ class VisionTransformerLearnerNode:
             processor = PvtImageProcessor.from_pretrained("Zetatech/pvt-medium-224")
             model = PvtForImageClassification.from_pretrained("Zetatech/pvt-medium-224")
 
-
         # Get class names(=column names) for probability estimates
         prob_estimates_column_names = kutil.pd.DataFrame(columns=train_labels.unique())
 
@@ -225,7 +222,6 @@ class VisionTransformerLearnerNode:
                 )
             ).get()
 
-
         # Determine the number of classes dynamically
         num_classes = len(label_enc.classes_)
 
@@ -236,7 +232,6 @@ class VisionTransformerLearnerNode:
         if num_classes:
             class_probability_schema = input_table_schema[-num_classes:].get()
 
-        #TODO create schema later
         class ImageDataset(Dataset):
             def __init__(self, image_data, labels, processor):
                 self.images = image_data
@@ -293,7 +288,7 @@ class VisionTransformerLearnerNode:
                 loss.backward()
 
                 kutil.check_canceled(exec_context)
-                
+
                 optimizer.step()
 
                 total_loss_train += loss.item()
@@ -331,27 +326,10 @@ class VisionTransformerLearnerNode:
                 f"Train Acc: {avg_train_acc:.3f} | Val Loss: {avg_val_loss:.3f} | Val Acc: {avg_val_acc:.3f}"
             )
 
-        # port_object_spec = kutil.ClassificationModelObjectSpec(
-        #     feature_schema=knext.Schema.from_columns(
-        #         [
-        #             knext.Column(name=col, ktype=knext.string())
-        #             for col in df_train.columns
-        #         ]
-        #     ),
-        #     target_schema=knext.Schema.from_columns(
-        #         [knext.Column(name=self.label_column, ktype=knext.double())]
-        #     ),
-        #     class_probability_schema=knext.Schema.from_columns(
-        #         [
-        #             knext.Column(name=f"Probability_Label_{i}", ktype=knext.double())
-        #             for i in range(num_classes)
-        #         ]
-        #     ),
-        #     model_choice=self.model_choice,  # Pass model choice
-        # )
-
-        trained_model = kutil.ClassificationModelObject(
-            spec=self._create_spec(input_table_schema, input_table_schema, class_probability_schema),
+        trained_model = kutil.ViTClassificationModelObject(
+            spec=self._create_spec(
+                input_table_schema, input_table_schema, class_probability_schema
+            ),
             model=model,
             label_enc=label_enc,
         )
@@ -409,7 +387,7 @@ class VisionTransformerPredictor:
     def configure(
         self,
         configure_context: knext.ConfigurationContext,
-        model_spec: kutil.ClassificationModelObjectSpec,
+        model_spec: kutil.ViTClassificationModelObjectSpec,
         table_schema: knext.Schema,
     ):
 
@@ -422,11 +400,6 @@ class VisionTransformerPredictor:
             table_schema = table_schema.append(
                 knext.Column(ktype=knext.string(), name=column_name)
             )
-
-        # # Define prediction column
-        # table_schema = table_schema.append(
-        #     knext.Column(ktype=knext.string(), name=prediction_column)
-        # )
 
         # Add probability estimate column names in the schema
         if self.predictor_settings.predict_probs:
@@ -443,21 +416,21 @@ class VisionTransformerPredictor:
                         knext.Column(ktype=column.ktype, name=column.name)
                     )
 
-        LOGGER.warning(f"Configured Schema: {[col.name for col in table_schema]}")
         return table_schema
 
     def execute(
         self,
         exec_context: knext.ExecutionContext,
-        model_port: kutil.ClassificationModelObject,
+        model_port: kutil.ViTClassificationModelObject,
         input_table_1,
     ):
         df_test = input_table_1.to_pandas()
 
-        # Get target column for the prediction column
+        # Get list target column for the prediction column
         y_pred = kutil.get_prediction_column_name(
             self.predictor_settings.prediction_column, model_port.spec.target_schema
         )
+
         class ImageDataset(Dataset):
             def __init__(self, image_data, processor):
                 self.images = image_data
@@ -473,11 +446,11 @@ class VisionTransformerPredictor:
                 ).pixel_values.squeeze(0)
                 return processed_image
 
-        LOGGER.warning(model_port.spec.feature_schema)
-        feature_columns = model_port.spec.feature_schema.column_names
-        features = df_test[feature_columns]
+        image_col = model_port.spec.image_schema.column_names
 
-        images = features[feature_columns[0]]
+        features = df_test[image_col]
+
+        images = features[image_col[0]]
 
         processor = ViTImageProcessor.from_pretrained("google/vit-base-patch16-224")
 
@@ -501,24 +474,26 @@ class VisionTransformerPredictor:
                     )
                     all_probabilities.extend(probabilities)
 
-
         decoded_predictions = model_port.decode_target_values(
             kutil.pd.Series(all_predictions)
         )
 
-        LOGGER.warning(y_pred)
-
-        LOGGER.warning(df_test)
         decoded_predictions.index = df_test.index
         df_test[y_pred[0]] = decoded_predictions
 
         if self.predictor_settings.predict_probs:
+
+            if self.predictor_settings.prediction_column:
+                # Get original target column name (and not the custom name)
+                # for class probability column names
+                y_pred = kutil.get_prediction_column_name(
+                    "", model_port.spec.target_schema
+                )
+
             class_probability_names = model_port.get_class_probability_column_names(
-                y_pred[0]
+                y_pred, self.predictor_settings.prob_columns_suffix
             )
             for col, probs in zip(class_probability_names, zip(*all_probabilities)):
                 df_test[col] = probs
 
-        actual_schema = {col: str(df_test[col].dtype) for col in df_test.columns}
-        LOGGER.warning(f"Actual Schema: {actual_schema}")
         return knext.Table.from_pandas(df_test)
