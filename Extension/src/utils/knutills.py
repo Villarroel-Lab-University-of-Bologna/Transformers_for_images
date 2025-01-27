@@ -1,11 +1,8 @@
 import knime.extension as knext
 import logging
 import pickle
-from sklearn.preprocessing import OneHotEncoder
 from sklearn.preprocessing import LabelEncoder
 import pandas as pd
-import torch
-from torch.nn.functional import softmax
 
 
 LOGGER = logging.getLogger(__name__)
@@ -20,7 +17,6 @@ LOCAL_DATE_VALUE = "org.knime.core.data.v2.time.LocalDateValueFactory"
 LOCAL_DATE_TIME_VALUE = "org.knime.core.data.v2.time.LocalDateTimeValueFactory"
 
 PNG_IMAGE_VALUE = "org.knime.core.data.image.png.PNGImageValueFactory"
-# SVG_IMAGE_VALUE = ""
 
 
 def is_zoned_datetime(column: knext.Column) -> bool:
@@ -89,14 +85,20 @@ def __is_type_x(column: knext.Column, type: str) -> bool:
 
 
 def is_string(column: knext.Column) -> bool:
-
+    """
+    Check if column is of type string
+    @return: True if Column Type is of type string
+    """
     return column.ktype == knext.string()
 
 
-def is_nominal(column):
-    
-    # Filter nominal columns
+def is_nominal(column: knext.Column) -> bool:
+    """
+    Check if column is a nominal datatype (string or a boolean)
+    @return: True if Column Type is of type string or a boolean
+    """
     return column.ktype == knext.string() or column.ktype == knext.bool_()
+
 
 def is_numeric(column: knext.Column) -> bool:
     """
@@ -160,64 +162,73 @@ def check_canceled(exec_context: knext.ExecutionContext) -> None:
     """
     if exec_context.is_canceled():
         raise RuntimeError("Execution canceled")
-    
+
 
 def get_prediction_column_name(prediction_column, target_schema):
     """
     Adds "_pred" suffix to prediction column names.
+    @returns: A list of all the columns in the target schema
     """
     if prediction_column.strip() != "":
         y_pred = [prediction_column for y in target_schema.column_names]
     else:
         y_pred = [f"{y}_pred" for y in target_schema.column_names]
 
+
     return y_pred
 
+
 def concatenate_predictions_with_input_table(df, dfx_predictions):
-    
-    # Concatenate prediction columns with features dataframe
+    """
+    Append the prediction column with input data frame
+    @returns: Updated dataframe with concatenated prediction column.
+    """
+    # Replace index with original dataframe
     dfx_predictions.index = df.index
+
+    # Horizontally append a column
     df = pd.concat([df, dfx_predictions], axis=1)
 
     return df
-    
-class ClassificationModelObjectSpec(knext.PortObjectSpec):
+
+
+class ViTClassificationModelObjectSpec(knext.PortObjectSpec):
     """
-    Spec for classification model port object.
+    Specification of ViT model port for classification.
     """
 
     def __init__(
         self,
-        feature_schema: knext.Schema,
+        image_schema: knext.Schema,
         target_schema: knext.Schema,
         class_probability_schema: knext.Schema,
-        model_choice: str,  # Add model choice
+        model_choice: str,
     ) -> None:
-        self._feature_schema = feature_schema
+        self._image_schema = image_schema
         self._target_schema = target_schema
         self._class_probability_schema = class_probability_schema
         self._model_choice = model_choice
 
     def serialize(self) -> dict:
         return {
-            "feature_schema": self._feature_schema.serialize(),
+            "image_schema": self._image_schema.serialize(),
             "target_schema": self._target_schema.serialize(),
             "class_probability_schema": self._class_probability_schema.serialize(),
             "model_choice": self._model_choice,
         }
 
     @classmethod
-    def deserialize(cls, data: dict) -> "ClassificationModelObjectSpec":
+    def deserialize(cls, data: dict) -> "ViTClassificationModelObjectSpec":
         return cls(
-            knext.Schema.deserialize(data["feature_schema"]),
+            knext.Schema.deserialize(data["image_schema"]),
             knext.Schema.deserialize(data["target_schema"]),
             knext.Schema.deserialize(data["class_probability_schema"]),
             data["model_choice"],
         )
 
     @property
-    def feature_schema(self) -> knext.Schema:
-        return self._feature_schema
+    def image_schema(self) -> knext.Schema:
+        return self._image_schema
 
     @property
     def target_schema(self) -> knext.Schema:
@@ -232,10 +243,10 @@ class ClassificationModelObjectSpec(knext.PortObjectSpec):
         return self._model_choice
 
 
-class ClassificationModelObject(knext.PortObject):
+class ViTClassificationModelObject(knext.PortObject):
     def __init__(
         self,
-        spec: ClassificationModelObjectSpec,
+        spec: ViTClassificationModelObjectSpec,
         model,
         label_enc,
     ) -> None:
@@ -252,55 +263,52 @@ class ClassificationModelObject(knext.PortObject):
         )
 
     @property
-    def spec(self) -> ClassificationModelObjectSpec:
+    def spec(self) -> ViTClassificationModelObjectSpec:
         return super().spec
 
     @property
     def one_hot_encoder(self) -> LabelEncoder:
         return self._label_enc
 
-
     @classmethod
     def deserialize(
-        cls, spec: ClassificationModelObjectSpec, data: bytes
-    ) -> "ClassificationModelObject":
+        cls, spec: ViTClassificationModelObjectSpec, data: bytes
+    ) -> "ViTClassificationModelObject":
         (
             model,
             label_encoder,
         ) = pickle.loads(data)
-        return cls(
-            spec, model, label_encoder
-        )
+        return cls(spec, model, label_encoder)
 
     def decode_target_values(self, predicted_column):
+
         if self._label_enc is None:
-            raise ValueError("Label encoder is not set. Ensure the encoder is passed during training.")
+            raise ValueError(
+                "Label encoder is not set. Ensure the encoder is passed during training."
+            )
 
-        le_name_mapping = dict(zip(range(len(self._label_enc.classes_)), self._label_enc.classes_))
-
+        le_name_mapping = dict(
+            zip(range(len(self._label_enc.classes_)), self._label_enc.classes_)
+        )
 
         decoded_column = predicted_column.replace(le_name_mapping)
         return decoded_column
 
+    def get_class_probability_column_names(self, predicted_column_name, suffix):
 
-    def get_class_probability_column_names(self, predicted_column):
-
-        # f"P({self.label_column}_pred={column_name})"
-        if self._label_enc is None:
-            raise ValueError("Label encoder is not set. Ensure the encoder is passed during training.")
-
-        # Generate column names for each class label
-        class_probability_column_names = []
-        for class_label in self._label_enc.classes_:
-            column_name = f"P({predicted_column}={class_label})"
-            class_probability_column_names.append(column_name)
+        # Class probability column names are adjusted to “P({predicted_col_name}={class_name})”
+        class_probability_column_names = self._label_enc.classes_
+        for i in range(len(class_probability_column_names)):
+            class_probability_column_names[i] = (
+                f"P({predicted_column_name[0]}={class_probability_column_names[i]}){suffix}"
+            )
 
         return class_probability_column_names
 
 
 
 classification_model_port_type = knext.port_type(
-    name="Classification Predictor model port type",
-    object_class=ClassificationModelObject,
-    spec_class=ClassificationModelObjectSpec,
+    name="ViT Classification Predictor model port type",
+    object_class=ViTClassificationModelObject,
+    spec_class=ViTClassificationModelObjectSpec,
 )
