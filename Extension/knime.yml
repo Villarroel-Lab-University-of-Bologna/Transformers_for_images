@@ -7,12 +7,13 @@ group_id: edu.luiss
 version: 1.0.0 # Version of this Python node extension
 vendor: KNIME AG, Zurich, Switzerland
 license_file: LICENSE.TXT # Best practice: put your LICENSE.TXT next to the knime.yml; otherwise you would need to change to path/to/LICENSE.txt
-#bundled_env_name: vit_new # we re-use the bundled Python environment
-env_yml_path: env.yml # this file is needed to create the dedicated conda environment upon installation in KNIME
+env_yml_path:
+  osx-64: bundling/osx-64-mac-intel.yml
+  osx-arm64: bundling/osx-arm64-mac-arm.yml # available starting from KNIME Analytics Platform 4.7
+  linux-64: bundling/linux-64-dist.yml
+  win-64: bundling/win-64-os.yml
 #the packages sometimes have different versions for each OS, following keys, point to the respective environment.yml files containing specific version of packages, this may not be applicable for all extensions but not necessary!
 #env_yml_path: env.yml
 #  Optionaa: define any KNIME related feature dependency here.
 feature_dependencies: 
- - org.knime.features.python3.scripting 5.3.0
-#   - org.knime.knip.feature
-#   - org.knime.features.core 5.1.1 #ensure that this extension can only be used with 5.1.1 which includes dialog rules
+ - org.knime.features.python3.scripting 5.4.0

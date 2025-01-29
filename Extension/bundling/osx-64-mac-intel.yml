@@ -1,0 +1,15 @@
+name: vit_flickr
+channels:
+  - knime
+  - conda-forge
+  - defaults
+  - pytorch
+dependencies:
+  - python=3.10
+  - knime-extension=5.4
+  - knime-python-base=5.4
+  - tokenizers=0.20.1
+  - transformers=4.45.2
+  - pytorch
+  - pip:
+    - scikit-learn==1.5.1

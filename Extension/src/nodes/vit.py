@@ -1,7 +1,7 @@
 import knime.extension as knext
 from utils import knutills as kutil
+from utils import modeling_utils as mutil
 import logging
-from torch.utils.data import Dataset, DataLoader
 from transformers import (
     ViTImageProcessor,
     ViTForImageClassification,
@@ -12,28 +12,24 @@ from transformers import (
 )
 import torch
 from torch.optim import Adam
-from sklearn.preprocessing import LabelEncoder
 
-
-use_cuda = torch.cuda.is_available()
-device = torch.device("cuda" if use_cuda else "cpu")
 
 LOGGER = logging.getLogger(__name__)
 
 
 # Define sub-category
 image_category = knext.category(
-    path="/community/vit_vision",
+    path="/community/vit_ft",
     level_id="vit",
-    name="Transformer model",
-    description="Python Nodes for Vision Transformers",
+    name="Models",
+    description="Vision Transformer fine-tune learner and predictor-",
     icon="icons/icon_Vision Transformer Learner.png",
 )
 
 
 # KNIME node definition for training
 @knext.node(
-    name="Transformer Learner",
+    name="ViT Classification Learner",
     node_type=knext.NodeType.LEARNER,
     icon_path="icons/icon_Vision Transformer Learner.png",
     category=image_category,
@@ -176,19 +172,19 @@ class VisionTransformerLearnerNode:
 
         class_probability_schema = None
 
-        # Extract images and labels
+        # Extract images and labels from both training and validation input table.
         train_images = df_train[image_column]
         train_labels = df_train[label_column]
+
         val_images = df_val[image_column]
         val_labels = df_val[label_column]
 
         # Initialize a label encoder and encode labels
-        label_enc = LabelEncoder()
+        label_enc = kutil.LabelEncoder()
         train_labels_encoded = label_enc.fit_transform(train_labels)
         val_labels_encoded = label_enc.transform(val_labels)
 
         # Model selection logic
-
         if self.model_choice == "ViT":
             processor = ViTImageProcessor.from_pretrained("google/vit-base-patch16-224")
             model = ViTForImageClassification.from_pretrained(
@@ -232,33 +228,22 @@ class VisionTransformerLearnerNode:
         if num_classes:
             class_probability_schema = input_table_schema[-num_classes:].get()
 
-        class ImageDataset(Dataset):
-            def __init__(self, image_data, labels, processor):
-                self.images = image_data
-                self.labels = labels
-                self.processor = processor
-
-            def __len__(self):
-                return len(self.images)
-
-            def __getitem__(self, idx):
-                image = self.images[idx].convert("RGB")
-                processed_image = self.processor(
-                    images=image, return_tensors="pt"
-                ).pixel_values.squeeze(0)
-                label = self.labels[idx]
-                return processed_image, label
-
         # Create datasets and data loaders
-        train_dataset = ImageDataset(train_images, train_labels_encoded, processor)
-        val_dataset = ImageDataset(val_images, val_labels_encoded, processor)
+        train_dataset = mutil.TrainingImageDataset(
+            train_images, train_labels_encoded, processor
+        )
+        val_dataset = mutil.TrainingImageDataset(
+            val_images, val_labels_encoded, processor
+        )
 
         kutil.check_canceled(exec_context)
 
-        train_loader = DataLoader(
+        train_loader = mutil.DataLoader(
             train_dataset, batch_size=self.batch_size, shuffle=True
         )
-        val_loader = DataLoader(val_dataset, batch_size=self.batch_size, shuffle=False)
+        val_loader = mutil.DataLoader(
+            val_dataset, batch_size=self.batch_size, shuffle=False
+        )
 
         exec_context.set_progress(0.3)
 
@@ -281,7 +266,7 @@ class VisionTransformerLearnerNode:
             for train_images, train_labels in train_loader:
                 optimizer.zero_grad()
                 outputs = model(pixel_values=train_images).logits
-                train_labels = train_labels.to(device)
+                train_labels = train_labels.to(mutil.device)
                 loss = criterion(outputs, train_labels.long())
                 acc = (outputs.argmax(dim=1) == train_labels).sum().item()
 
@@ -308,7 +293,7 @@ class VisionTransformerLearnerNode:
                 for val_images, val_labels in val_loader:
                     outputs = model(pixel_values=val_images).logits
                     val_labels = val_labels.to(
-                        device
+                        mutil.device
                     )  # Convert labels to the correct device
                     loss = criterion(outputs, val_labels.long())
                     acc = (outputs.argmax(dim=1) == val_labels).sum().item()
@@ -362,7 +347,7 @@ class ClassificationPredictorGeneralSettings:
 
 # KNIME node definition for prediction
 @knext.node(
-    name="Transformer Predictor",
+    name="ViT Classification Predictor",
     node_type=knext.NodeType.PREDICTOR,
     icon_path="icons/icon_Vision Transformer Predictor.png",
     category=image_category,
@@ -431,31 +416,18 @@ class VisionTransformerPredictor:
             self.predictor_settings.prediction_column, model_port.spec.target_schema
         )
 
-        class ImageDataset(Dataset):
-            def __init__(self, image_data, processor):
-                self.images = image_data
-                self.processor = processor
-
-            def __len__(self):
-                return len(self.images)
-
-            def __getitem__(self, idx):
-                image = self.images.iloc[idx].convert("RGB")
-                processed_image = self.processor(
-                    images=image, return_tensors="pt"
-                ).pixel_values.squeeze(0)
-                return processed_image
-
         image_col = model_port.spec.image_schema.column_names
 
         features = df_test[image_col]
+
+        LOGGER.warning(image_col[0])
 
         images = features[image_col[0]]
 
         processor = ViTImageProcessor.from_pretrained("google/vit-base-patch16-224")
 
-        dataset = ImageDataset(images, processor)
-        dataloader = DataLoader(dataset, batch_size=8, shuffle=False)
+        dataset = mutil.PredictionImageDataset(images, processor)
+        dataloader = mutil.DataLoader(dataset, batch_size=8, shuffle=False)
 
         model_port._model.eval()
         all_predictions = []
