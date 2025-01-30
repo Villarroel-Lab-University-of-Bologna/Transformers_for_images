@@ -12,8 +12,5 @@ env_yml_path:
   osx-arm64: bundling/osx-arm64-mac-arm.yml # available starting from KNIME Analytics Platform 4.7
   linux-64: bundling/linux-64-dist.yml
   win-64: bundling/win-64-os.yml
-#the packages sometimes have different versions for each OS, following keys, point to the respective environment.yml files containing specific version of packages, this may not be applicable for all extensions but not necessary!
-#env_yml_path: env.yml
-#  Optionaa: define any KNIME related feature dependency here.
 feature_dependencies: 
  - org.knime.features.python3.scripting 5.4.0
