@@ -433,7 +433,19 @@ class VisionTransformerPredictor:
 
         images = features[image_col[0]]
 
-        processor = ViTImageProcessor.from_pretrained("google/vit-base-patch16-224")
+
+        if self.model_choice == mutil.ViTModelSelection.ViT.name:
+            processor = ViTImageProcessor.from_pretrained(
+                mutil.ViTModelSelection.ViT.description
+            )
+        elif self.model_choice == mutil.ViTModelSelection.SWIN.name:
+            processor = AutoImageProcessor.from_pretrained(
+                mutil.ViTModelSelection.SWIN.description
+            )
+        elif self.model_choice == mutil.ViTModelSelection.PYRAMID.name:
+            processor = PvtImageProcessor.from_pretrained(
+                mutil.ViTModelSelection.PYRAMID.description
+            )
 
         dataset = mutil.PredictionImageDataset(images, processor)
         dataloader = mutil.DataLoader(dataset, batch_size=8, shuffle=False)
