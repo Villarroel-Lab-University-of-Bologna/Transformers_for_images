@@ -91,11 +91,11 @@ class VisionTransformerLearnerNode:
         min_value=1e-6,
     )
 
-    model_choice = knext.StringParameter(
+    model_choice = knext.EnumParameter(
         label="Model Choice",
         description="Choose the Transformer model to use: ViT, Swin Transformer, or Pyramid Transformer.",
-        default_value="ViT",
-        enum=["ViT", "Swin Transformer", "Pyramid Transformer"],
+        default_value=mutil.ViTModelSelection.get_default().name,
+        enum=mutil.ViTModelSelection,
     )
 
     def configure(
@@ -183,23 +183,32 @@ class VisionTransformerLearnerNode:
         label_enc = kutil.LabelEncoder()
         train_labels_encoded = label_enc.fit_transform(train_labels)
         val_labels_encoded = label_enc.transform(val_labels)
+        
+        LOGGER.warn(self.model_choice)
+
 
         # Model selection logic
-        if self.model_choice == "ViT":
-            processor = ViTImageProcessor.from_pretrained("google/vit-base-patch16-224")
-            model = ViTForImageClassification.from_pretrained(
-                "google/vit-base-patch16-224"
+        if self.model_choice == mutil.ViTModelSelection.ViT.name:
+            processor = ViTImageProcessor.from_pretrained(
+                mutil.ViTModelSelection.ViT.description
             )
-        elif self.model_choice == "Swin Transformer":
+            model = ViTForImageClassification.from_pretrained(
+                mutil.ViTModelSelection.ViT.description
+            )
+        elif self.model_choice == mutil.ViTModelSelection.SWIN.name:
             processor = AutoImageProcessor.from_pretrained(
-                "microsoft/swin-base-patch4-window7-224"
+                mutil.ViTModelSelection.SWIN.description
             )
             model = SwinForImageClassification.from_pretrained(
-                "microsoft/swin-base-patch4-window7-224"
+                mutil.ViTModelSelection.SWIN.description
             )
-        elif self.model_choice == "Pyramid Transformer":
-            processor = PvtImageProcessor.from_pretrained("Zetatech/pvt-medium-224")
-            model = PvtForImageClassification.from_pretrained("Zetatech/pvt-medium-224")
+        elif self.model_choice == mutil.ViTModelSelection.PYRAMID.name:
+            processor = PvtImageProcessor.from_pretrained(
+                mutil.ViTModelSelection.PYRAMID.description
+            )
+            model = PvtForImageClassification.from_pretrained(
+                mutil.ViTModelSelection.PYRAMID.description
+            )
 
         # Get class names(=column names) for probability estimates
         prob_estimates_column_names = kutil.pd.DataFrame(columns=train_labels.unique())

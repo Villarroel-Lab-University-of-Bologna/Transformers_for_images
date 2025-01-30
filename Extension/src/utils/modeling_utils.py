@@ -1,5 +1,6 @@
 from torch.utils.data import Dataset, DataLoader
 import torch
+from . import knutills as kutil
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -36,3 +37,22 @@ class PredictionImageDataset(Dataset):
             images=image, return_tensors="pt"
         ).pixel_values.squeeze(0)
         return processed_image
+
+
+class ViTModelSelection(kutil.knext.EnumParameterOptions):
+    ViT = (
+        "ViT",
+        "google/vit-base-patch16-224",
+    )
+    SWIN = (
+        "Swin",
+        "microsoft/swin-base-patch4-window7-224",
+    )
+    PYRAMID = (
+        "Pyramid Transformer",
+        "Zetatech/pvt-medium-224.",
+    )
+
+    @classmethod
+    def get_default(cls):
+        return cls.ViT
