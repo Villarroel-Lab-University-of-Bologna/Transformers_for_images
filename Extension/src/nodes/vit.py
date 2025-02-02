@@ -258,7 +258,10 @@ class VisionTransformerLearnerNode:
 
         # Model setup
         model.config.num_labels = num_classes
-        model.classifier = torch.nn.Linear(model.config.hidden_size, num_classes)
+        if self.model_choice == mutil.ViTModelSelection.PYRAMID.name:
+            model.classifier = torch.nn.Linear(model.config.hidden_sizes[-1], num_classes)
+        else:
+            model.classifier = torch.nn.Linear(model.config.hidden_size, num_classes)
         criterion = torch.nn.CrossEntropyLoss()
         optimizer = Adam(model.parameters(), lr=self.learning_rate)
 
