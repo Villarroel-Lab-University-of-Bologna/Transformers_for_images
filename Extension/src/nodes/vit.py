@@ -50,11 +50,33 @@ image_category = knext.category(
 )
 class VisionTransformerLearnerNode:
     """
+    Vision Transformer Learner
 
-    Learner node
+    Learns an image classification model using a Vision Transformer (ViT) architecture, implemented by the 
+    [Hugging Face Transformers](https://huggingface.co/docs/transformers/index) library.
+    It is a deep learning model that processes image data by dividing it into patches and applying transformer-based 
+    self-attention mechanisms.
 
+    The model is trained using a selected image column and label column from the input training dataset. Users can 
+    choose from multiple Vision Transformer architectures, including ViT, Swin Transformer, and Pyramid Transformer. 
+    Training parameters such as batch size, number of epochs, and learning rate can be customized. The node outputs 
+    a trained Vision Transformer model that can be used for image classification with the Transformer Predictor node.
+
+    Models:
+    - **Vision Transformer (ViT)**: A transformer-based model for image classification that treats images as sequences of 
+      patches and applies self-attention mechanisms. 
+      [More info](https://huggingface.co/docs/transformers/model_doc/vit)
+
+    - **Swin Transformer**: A hierarchical transformer model with shifted window attention, designed for high-resolution 
+      image classification and dense prediction tasks.
+      [More info](https://huggingface.co/docs/transformers/model_doc/swin)
+
+    - **Pyramid Vision Transformer (PVT)**: A transformer model that incorporates a pyramid structure with progressively 
+      shrinking patch sizes, making it efficient for tasks like object detection and segmentation.
+      [More info](https://huggingface.co/docs/transformers/model_doc/pvt)
 
     """
+
 
     image_column = knext.ColumnParameter(
         label="Image Column",
@@ -377,6 +399,20 @@ class ClassificationPredictorGeneralSettings:
     name="Output table", description="Resulting table with prediction categories."
 )
 class VisionTransformerPredictor:
+
+    """
+    Vision Transformer Predictor   
+
+    The Vision Transformer Predictor Node applies a trained Vision Transformer model to classify images in the given input dataset.
+    It computes the predicted class for each image and, optionally, provides class probability estimates.
+
+    The node requires a trained Transformer model from the Transformer Learner Node and a dataset containing image data.
+    The prediction column name can be customized, and the node supports multiple Transformer architectures.
+    
+    It is only executable if the test data contains the image column that was used by the learner model.
+    
+    """
+
 
     predictor_settings = ClassificationPredictorGeneralSettings()
 
