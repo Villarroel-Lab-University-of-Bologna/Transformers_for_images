@@ -1,4 +1,5 @@
 import knime.extension as knext
+import pandas as pd
 from utils import knutills as kutil
 from utils import modeling_utils as mutil
 import logging
@@ -48,6 +49,9 @@ image_category = knext.category(
     port_type=kutil.classification_model_port_type,
     description="Output containing the trained Vision Transformer model.",
 )
+@knext.output_table(
+    name="Output table", description="Table containing results for each epoch for train and validation."
+)
 class VisionTransformerLearnerNode:
     """
 
@@ -67,7 +71,7 @@ class VisionTransformerLearnerNode:
         label="Label Column",
         description="Select the column containing class labels.",
         port_index=0,
-        column_filter=kutil.is_nominal,
+        column_filter=kutil.is_numeric_or_string,
     )
 
     num_epochs = knext.IntParameter(
@@ -104,10 +108,19 @@ class VisionTransformerLearnerNode:
         training_schema: knext.Schema,
         validation_schema: knext.Schema,
     ):
+        model_spec = self._create_spec(training_schema, validation_schema, class_probability_schema=None)
 
-        return self._create_spec(
-            training_schema, validation_schema, class_probability_schema=None
-        )
+        # Define schema for output table
+        summary_schema = knext.Schema.from_columns([
+            knext.Column(knext.int32(), "Epoch"),
+            knext.Column(knext.double(), "Train Loss"),
+            knext.Column(knext.double(), "Train Accuracy"),
+            knext.Column(knext.double(), "Validation Loss"),
+            knext.Column(knext.double(), "Validation Accuracy"),
+        ])
+
+        return model_spec, summary_schema # Return the model spec and the schema for the output table
+
 
     def _create_spec(
         self,
@@ -262,63 +275,58 @@ class VisionTransformerLearnerNode:
         criterion = torch.nn.CrossEntropyLoss()
         optimizer = Adam(model.parameters(), lr=self.learning_rate)
 
+
+        # Training loop with table creation
+        training_summary = []
+
         kutil.check_canceled(exec_context)
-        # Training loop with validation
+
         for epoch in range(self.num_epochs):
-            # Training Phase
             model.train()
-            total_loss_train = 0.0
-            total_acc_train = 0
-
-            kutil.check_canceled(exec_context)
-
-            for train_images, train_labels in train_loader:
+            total_loss_train, total_acc_train = 0.0, 0
+            
+            for images, labels in train_loader:
                 optimizer.zero_grad()
-                outputs = model(pixel_values=train_images).logits
-                train_labels = train_labels.to(mutil.device)
-                loss = criterion(outputs, train_labels.long())
-                acc = (outputs.argmax(dim=1) == train_labels).sum().item()
-
+                outputs = model(pixel_values=images).logits
+                labels = labels.to(mutil.device)
+                loss = criterion(outputs, labels.long())
+                acc = (outputs.argmax(dim=1) == labels).sum().item()
                 loss.backward()
-
-                kutil.check_canceled(exec_context)
-
                 optimizer.step()
-
                 total_loss_train += loss.item()
                 total_acc_train += acc
-
+            
+            kutil.check_canceled(exec_context)
             avg_train_loss = total_loss_train / len(train_loader)
-            avg_train_acc = total_acc_train / len(train_dataset)
-
-            exec_context.set_progress(0.6)
-
-            # Validation Phase
+            avg_train_acc = total_acc_train / len(df_train)
+            
             model.eval()
-            total_loss_val = 0.0
-            total_acc_val = 0
-
+            total_loss_val, total_acc_val = 0.0, 0
+            
             with torch.no_grad():
-                for val_images, val_labels in val_loader:
-                    outputs = model(pixel_values=val_images).logits
-                    val_labels = val_labels.to(
-                        mutil.device
-                    )  # Convert labels to the correct device
-                    loss = criterion(outputs, val_labels.long())
-                    acc = (outputs.argmax(dim=1) == val_labels).sum().item()
-
+                for images, labels in val_loader:
+                    outputs = model(pixel_values=images).logits
+                    labels = labels.to(mutil.device)  # Convert labels to the correct device
+                    loss = criterion(outputs, labels.long())
+                    acc = (outputs.argmax(dim=1) == labels).sum().item()
                     total_loss_val += loss.item()
                     total_acc_val += acc
-
-            exec_context.set_progress(0.8)
-
+            
             avg_val_loss = total_loss_val / len(val_loader)
-            avg_val_acc = total_acc_val / len(val_dataset)
+            avg_val_acc = total_acc_val / len(df_val)
+            
+            training_summary.append([epoch + 1, avg_train_loss, avg_train_acc, avg_val_loss, avg_val_acc])
 
-            LOGGER.info(
-                f"Epoch {epoch + 1}/{self.num_epochs} | Train Loss: {avg_train_loss:.3f} | "
-                f"Train Acc: {avg_train_acc:.3f} | Val Loss: {avg_val_loss:.3f} | Val Acc: {avg_val_acc:.3f}"
-            )
+        summary_df = pd.DataFrame(training_summary, columns=["Epoch", "Train Loss", "Train Accuracy", "Validation Loss", "Validation Accuracy"])
+
+        # Force column types to match `configure()`
+        summary_df = summary_df.astype({
+            "Epoch": "int32",
+            "Train Loss": "float64",
+            "Train Accuracy": "float64",
+            "Validation Loss": "float64",
+            "Validation Accuracy": "float64"
+        })
 
         trained_model = kutil.ViTClassificationModelObject(
             spec=self._create_spec(
@@ -327,9 +335,8 @@ class VisionTransformerLearnerNode:
             model=model,
             label_enc=label_enc,
         )
-
-        return trained_model
-
+        
+        return trained_model, knext.Table.from_pandas(summary_df)
 
 # General settings for classification predictor node
 @knext.parameter_group(label="Output")
