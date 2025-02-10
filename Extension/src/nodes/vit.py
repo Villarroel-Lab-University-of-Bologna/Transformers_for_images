@@ -186,7 +186,6 @@ class VisionTransformerLearnerNode:
         
         LOGGER.warn(self.model_choice)
 
-
         # Model selection logic
         if self.model_choice == mutil.ViTModelSelection.ViT.name:
             processor = ViTImageProcessor.from_pretrained(
@@ -259,7 +258,9 @@ class VisionTransformerLearnerNode:
         # Model setup
         model.config.num_labels = num_classes
         if self.model_choice == mutil.ViTModelSelection.PYRAMID.name:
-            model.classifier = torch.nn.Linear(model.config.hidden_sizes[-1], num_classes)
+            model.classifier = torch.nn.Linear(
+                model.config.hidden_sizes[-1], num_classes
+            )
         else:
             model.classifier = torch.nn.Linear(model.config.hidden_size, num_classes)
         criterion = torch.nn.CrossEntropyLoss()
