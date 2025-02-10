@@ -258,7 +258,10 @@ class VisionTransformerLearnerNode:
 
         # Model setup
         model.config.num_labels = num_classes
-        model.classifier = torch.nn.Linear(model.config.hidden_size, num_classes)
+        if self.model_choice == mutil.ViTModelSelection.PYRAMID.name:
+            model.classifier = torch.nn.Linear(model.config.hidden_sizes[-1], num_classes)
+        else:
+            model.classifier = torch.nn.Linear(model.config.hidden_size, num_classes)
         criterion = torch.nn.CrossEntropyLoss()
         optimizer = Adam(model.parameters(), lr=self.learning_rate)
 
@@ -432,8 +435,21 @@ class VisionTransformerPredictor:
         LOGGER.warning(image_col[0])
 
         images = features[image_col[0]]
+        
+        model_name = model_port.spec.model_choice
 
-        processor = ViTImageProcessor.from_pretrained("google/vit-base-patch16-224")
+        if model_name == mutil.ViTModelSelection.ViT.name:
+            processor = ViTImageProcessor.from_pretrained(
+                mutil.ViTModelSelection.ViT.description
+            )
+        elif model_name == mutil.ViTModelSelection.SWIN.name:
+            processor = AutoImageProcessor.from_pretrained(
+                mutil.ViTModelSelection.SWIN.description
+            )
+        elif model_name == mutil.ViTModelSelection.PYRAMID.name:
+            processor = PvtImageProcessor.from_pretrained(
+                mutil.ViTModelSelection.PYRAMID.description
+            )
 
         dataset = mutil.PredictionImageDataset(images, processor)
         dataloader = mutil.DataLoader(dataset, batch_size=8, shuffle=False)
