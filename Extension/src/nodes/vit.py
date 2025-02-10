@@ -183,9 +183,8 @@ class VisionTransformerLearnerNode:
         label_enc = kutil.LabelEncoder()
         train_labels_encoded = label_enc.fit_transform(train_labels)
         val_labels_encoded = label_enc.transform(val_labels)
-        
-        LOGGER.warn(self.model_choice)
 
+        LOGGER.warn(self.model_choice)
 
         # Model selection logic
         if self.model_choice == mutil.ViTModelSelection.ViT.name:
@@ -259,7 +258,9 @@ class VisionTransformerLearnerNode:
         # Model setup
         model.config.num_labels = num_classes
         if self.model_choice == mutil.ViTModelSelection.PYRAMID.name:
-            model.classifier = torch.nn.Linear(model.config.hidden_sizes[-1], num_classes)
+            model.classifier = torch.nn.Linear(
+                model.config.hidden_sizes[-1], num_classes
+            )
         else:
             model.classifier = torch.nn.Linear(model.config.hidden_size, num_classes)
         criterion = torch.nn.CrossEntropyLoss()
@@ -436,16 +437,17 @@ class VisionTransformerPredictor:
 
         images = features[image_col[0]]
 
+        model_name = model_port.spec.model_choice
 
-        if self.model_choice == mutil.ViTModelSelection.ViT.name:
+        if model_name == mutil.ViTModelSelection.ViT.name:
             processor = ViTImageProcessor.from_pretrained(
                 mutil.ViTModelSelection.ViT.description
             )
-        elif self.model_choice == mutil.ViTModelSelection.SWIN.name:
+        elif model_name == mutil.ViTModelSelection.SWIN.name:
             processor = AutoImageProcessor.from_pretrained(
                 mutil.ViTModelSelection.SWIN.description
             )
-        elif self.model_choice == mutil.ViTModelSelection.PYRAMID.name:
+        elif model_name == mutil.ViTModelSelection.PYRAMID.name:
             processor = PvtImageProcessor.from_pretrained(
                 mutil.ViTModelSelection.PYRAMID.description
             )
