@@ -50,7 +50,7 @@ class ViTModelSelection(kutil.knext.EnumParameterOptions):
     )
     PYRAMID = (
         "Pyramid Transformer",
-        "Zetatech/pvt-medium-224.",
+        "Zetatech/pvt-medium-224",
     )
 
     @classmethod

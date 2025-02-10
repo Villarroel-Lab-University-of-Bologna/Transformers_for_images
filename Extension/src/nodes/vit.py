@@ -183,8 +183,6 @@ class VisionTransformerLearnerNode:
         label_enc = kutil.LabelEncoder()
         train_labels_encoded = label_enc.fit_transform(train_labels)
         val_labels_encoded = label_enc.transform(val_labels)
-        
-        LOGGER.warn(self.model_choice)
 
         # Model selection logic
         if self.model_choice == mutil.ViTModelSelection.ViT.name:
@@ -433,10 +431,8 @@ class VisionTransformerPredictor:
 
         features = df_test[image_col]
 
-        LOGGER.warning(image_col[0])
-
         images = features[image_col[0]]
-        
+
         model_name = model_port.spec.model_choice
 
         if model_name == mutil.ViTModelSelection.ViT.name:
