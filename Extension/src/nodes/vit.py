@@ -184,8 +184,6 @@ class VisionTransformerLearnerNode:
         train_labels_encoded = label_enc.fit_transform(train_labels)
         val_labels_encoded = label_enc.transform(val_labels)
 
-        LOGGER.warn(self.model_choice)
-
         # Model selection logic
         if self.model_choice == mutil.ViTModelSelection.ViT.name:
             processor = ViTImageProcessor.from_pretrained(
@@ -432,8 +430,6 @@ class VisionTransformerPredictor:
         image_col = model_port.spec.image_schema.column_names
 
         features = df_test[image_col]
-
-        LOGGER.warning(image_col[0])
 
         images = features[image_col[0]]
 
