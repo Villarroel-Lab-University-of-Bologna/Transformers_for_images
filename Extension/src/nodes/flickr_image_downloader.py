@@ -5,16 +5,21 @@ import logging
 
 LOGGER = logging.getLogger(__name__)
 
-@knext.node(
-    name="Flickr Image Downloader",
-    node_type=knext.NodeType.SOURCE,
-    category=knext.category(
-        path="/community/demo",
-        level_id="demoimg",
+# Define sub-category
+image_category=knext.category(
+        path="/community/vit_ft",
+        level_id="flickrimg",
         name="Flickr Image Downloader",
         description="Node for downloading image URLs from Flickr",
         icon = "icons/icon.png"
-    ),
+    )
+
+
+@knext.node(
+    name="Flickr Image Downloader",
+    node_type=knext.NodeType.SOURCE,
+    icon_path="icons/icon.png",
+    category=image_category,
     id="img-downloader",
 )
 @knext.output_table(
@@ -26,18 +31,19 @@ class FlickrImageDownloader:
     Node for downloading images from Flickr using a search term, an API key, and the desired number of images.
     """
 
-    api_key = knext.StringParameter(
-        label="API Key",
-        description="Your Flickr API key to authenticate requests.",
-        default_value="",
+    credential_param = knext.StringParameter(
+        label="Flickr API Key",
+        description="Choose one of the connected credentials (Pass key through credential config password field)",
+        choices=lambda a: knext.DialogCreationContext.get_credential_names(a)
     )
-
+    
     search_term = knext.StringParameter(
         label="Search Term",
         description="Search term for the images to download.",
         default_value="",
     )
 
+#The maximum nuumber of images that can be downloaded for every page is 500
     no_images = knext.IntParameter(
         label="Number of Images",
         description="Number of images to retrieve from Flickr.",
@@ -46,19 +52,28 @@ class FlickrImageDownloader:
         max_value=500,
     )
 
-    def configure(self):
+
+    def configure(self, ctx: knext.ConfigurationContext):
+        if not ctx.get_credential_names():
+            raise knext.InvalidParametersError("No credentials provided.")
+        if not self.credential_param:
+            raise knext.InvalidParametersError("Credentials not selected.")
         return knext.Schema.from_columns([
             knext.Column(name="Image URL", ktype=knext.string())
         ])
 
-    def execute(self, exec_context):
+
+    def execute(self, ctx: knext.ExecutionContext):
+        # Fetch credentials from KNIME node
+        credentials = ctx.get_credentials(self.credential_param)
+        self.api_key = credentials.password # Use the password field to store the API key
         base_url = "https://www.flickr.com/services/rest/"
         params = {
-            "method": "flickr.photos.search",
-            "api_key": self.api_key,
-            "text": self.search_term,
-            "per_page": self.no_images,
-            "format": "json",
+            "method": "flickr.photos.search",   # Method to search for photos
+            "api_key": self.api_key,            # API key
+            "text": self.search_term,           # Search term
+            "per_page": self.no_images,         # Number of images to retrieve
+            "format": "json",                   # Format of the response
             "nojsoncallback": 1,
         }
 
@@ -87,5 +102,5 @@ class FlickrImageDownloader:
         result_df = pd.DataFrame({"Image URL": urls})
 
         # Report progress
-        exec_context.set_progress(1.0, "Image retrieval complete.")
+        ctx.set_progress(1.0, "Image retrieval complete.")
         return knext.Table.from_pandas(result_df)
