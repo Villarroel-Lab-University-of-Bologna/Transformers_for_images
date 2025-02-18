@@ -49,7 +49,7 @@ class FlickrImageDownloader:
         description="Number of images to retrieve from Flickr.",
         default_value=10,
         min_value=1,
-        max_value=500,
+        max_value=20000,
     )
 
 
@@ -66,37 +66,66 @@ class FlickrImageDownloader:
     def execute(self, ctx: knext.ExecutionContext):
         # Fetch credentials from KNIME node
         credentials = ctx.get_credentials(self.credential_param)
-        self.api_key = credentials.password # Use the password field to store the API key
+        self.api_key = credentials.password  # Use the password field to store the API key
         base_url = "https://www.flickr.com/services/rest/"
-        params = {
-            "method": "flickr.photos.search",   # Method to search for photos
-            "api_key": self.api_key,            # API key
-            "text": self.search_term,           # Search term
-            "per_page": self.no_images,         # Number of images to retrieve
-            "format": "json",                   # Format of the response
-            "nojsoncallback": 1,
-        }
 
-        LOGGER.info("Sending request to Flickr API...")
-        response = requests.get(base_url, params=params)
-
-        if response.status_code != 200:
-            raise RuntimeError(f"Failed to fetch data from Flickr API: {response.text}")
-
-        data = response.json()
-
-        if "photos" not in data or "photo" not in data["photos"]:
-            raise ValueError("Unexpected API response format.")
-
-        photo_list = data["photos"]["photo"]
-        
-        # Construct image URLs
+        max_per_page = 500  # Flickr's per-page limit
+        total_images = self.no_images  # User-requested total images
         urls = []
-        for photo in photo_list:
-            photo_url = f"https://farm{photo['farm']}.staticflickr.com/{photo['server']}/{photo['id']}_{photo['secret']}.jpg"
-            urls.append(photo_url)
+        page = 1
 
-        LOGGER.info(f"Retrieved {len(urls)} image URLs from Flickr.")
+        while len(urls) < total_images:
+            remaining_images = total_images - len(urls)
+            per_page = min(remaining_images, max_per_page)  # Limit per request
+
+            params = {
+                "method": "flickr.photos.search",
+                "api_key": self.api_key,
+                "text": self.search_term,
+                "per_page": per_page,
+                "page": page,  # Update page number
+                "format": "json",
+                "nojsoncallback": 1,
+            }
+
+            response = requests.get(base_url, params=params)
+
+            if response.status_code != 200:
+                raise RuntimeError(f"Failed to fetch data from Flickr API: {response.text}")
+
+            data = response.json()
+
+            if "photos" not in data or "photo" not in data["photos"]:
+                raise ValueError("Unexpected API response format.")
+
+            photo_list = data["photos"]["photo"]
+            
+            if not photo_list:
+                LOGGER.warning("No more images available. Stopping early.")
+                break  # Stop if no more images available
+
+            for photo in photo_list:
+                # Validate metadata
+                if (
+                    "farm" not in photo or photo["farm"] == 0 or
+                    "server" not in photo or not photo["server"] or
+                    "id" not in photo or not photo["id"] or
+                    "secret" not in photo or not photo["secret"]
+                ):
+                    LOGGER.warning(f"Skipping invalid photo: {photo}")
+                    continue  # Skip invalid entries
+
+                photo_url = f"https://farm{photo['farm']}.staticflickr.com/{photo['server']}/{photo['id']}_{photo['secret']}.jpg"
+                
+                if photo_url not in urls:  # Prevent duplicates
+                    urls.append(photo_url)
+
+                if len(urls) >= total_images:
+                    break  # Stop if we have enough images
+
+            page += 1  # Move to the next page
+
+        LOGGER.info(f"Retrieved {len(urls)} unique image URLs from Flickr.")
 
         # Create a DataFrame with the image URLs
         result_df = pd.DataFrame({"Image URL": urls})
