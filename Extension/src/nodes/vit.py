@@ -54,7 +54,7 @@ image_category = knext.category(
 )
 class VisionTransformerLearnerNode:
     """
-    Vision Transformer Learner Node
+    Vision Transformer Learner node
 
     The Vision Transformer Learner node enables users to fine-tune transformer-based models.
     It is a deep learning model that processes image data by dividing it into patches and applying transformer-based
@@ -81,12 +81,6 @@ class VisionTransformerLearnerNode:
       shrinking patch sizes, making it efficient for tasks like object detection and segmentation.
       [More info](https://huggingface.co/docs/transformers/model_doc/pvt)
 
-
-
-    ### Input Requirements:
-    - **Training Data**: A table containing images and corresponding labels for training the model.
-    - **Validation Data**: A table containing images and labels for validating model performance.
-
     ### Configuration Options:
     - **Image Column**: Select the column containing image data (must be in PNG format).
     - **Label Column**: Select the target column containing class labels.
@@ -95,26 +89,12 @@ class VisionTransformerLearnerNode:
     - **Learning Rate**: Sets the optimizer's step size for updating model weights.
     - **Model Choice**: Choose between ViT, Swin Transformer, or Pyramid Transformer.
 
-    ### Output:
-    - **Fine-tuned Model**: A fully fine-tuned transformer model that can be used for inference.
-    - **Training Summary Table**: A table displaying key training statistics:
-    - Epoch count
-    - Training loss
-    - Training accuracy
-    - Validation loss
-    - Validation accuracy
-
     ### How It Works:
     1. The node processes images and encodes labels.
     2. The selected transformer model is initialized and fine-tuned using the provided training data.
     3. A loss function (Cross-Entropy Loss) and optimizer (Adam) are applied to optimize model performance.
     4. Training runs for the specified number of epochs, tracking performance metrics.
     5. The trained model and a performance summary table are returned as outputs.
-
-    This node is ideal for users who want to fine-tune transformer models for image classification tasks without
-    writing complex deep-learning code. It integrates seamlessly into KNIME's analytics workflow, providing a
-    user-friendly interface for powerful model training.
-
 
     """
 
@@ -445,21 +425,13 @@ class VisionTransformerPredictor:
     """
     Vision Transformer Predictor
 
-
-    The Vision Transformer Predictor Node applies a fine-tuned Transformer model to classify images in the given input dataset.
+    The Vision Transformer Predictor node applies a fine-tuned Transformer model to classify images in the given input dataset.
     It computes the predicted class for each image and, optionally, provides class probability estimates.
 
-    The node requires a fine-tuned Transformer model from the Vision Transformer Learner Node and a dataset containing image data.
+    The node requires a fine-tuned Transformer model from the Vision Transformer Learner node and a dataset containing image data.
     The prediction column name can be customized, and the node supports multiple Transformer architectures.
 
     It is only executable if the test data contains the image column that was used by the learner model.
-
-
-
-    ### Input Requirements:
-
-    - **Trained Model**: A ViT model trained using the ViT Classification Learner node.
-    - **Test Input Data**: A table containing image data for classification.
 
     ### Configuration Options:
 
@@ -467,19 +439,12 @@ class VisionTransformerPredictor:
     - **Predict Probability Estimates**: Enable to obtain confidence scores for each class.
     - **Probability Columns Suffix**: Add a suffix to probability columns for easy identification.
 
-    ### Output:
-
-    - **Predicted Labels Table**: A table containing image predictions with the assigned class label.
-    - **Class Probability Estimates (Optional)**: If enabled, displays confidence scores for each class.
-
     ### How It Works:
 
     1. The node extracts images from the test dataset.
     2. The selected transformer model processes the images and makes predictions.
     3. The highest probability class is assigned as the predicted label.
     4. (Optional) Class probability estimates are computed using softmax and included in the output.
-
-
     """
 
     predictor_settings = ClassificationPredictorGeneralSettings()
