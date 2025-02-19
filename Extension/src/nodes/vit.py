@@ -50,11 +50,7 @@ image_category = knext.category(
 )
 class VisionTransformerLearnerNode:
     """
-<<<<<<< HEAD
-    Vision Transformer Learner Node
-=======
     Vision Transformer Learner node
->>>>>>> 3ab0327439941bbb84537ee3402d41cfb8e1a749
 
     The Vision Transformer Learner node enables users to fine-tune transformer-based models.
     It is a deep learning model that processes image data by dividing it into patches and applying transformer-based
@@ -81,15 +77,6 @@ class VisionTransformerLearnerNode:
       shrinking patch sizes, making it efficient for tasks like object detection and segmentation.
       [More info](https://huggingface.co/docs/transformers/model_doc/pvt)
 
-<<<<<<< HEAD
-
-
-    ### Input Requirements:
-    - **Training Data**: A table containing images and corresponding labels for training the model.
-    - **Validation Data**: A table containing images and labels for validating model performance.
-
-=======
->>>>>>> 3ab0327439941bbb84537ee3402d41cfb8e1a749
     ### Configuration Options:
     - **Image Column**: Select the column containing image data (must be in PNG format).
     - **Label Column**: Select the target column containing class labels.
@@ -105,14 +92,6 @@ class VisionTransformerLearnerNode:
     4. Training runs for the specified number of epochs, tracking performance metrics.
     5. The trained model and a performance summary table are returned as outputs.
 
-<<<<<<< HEAD
-    This node is ideal for users who want to fine-tune transformer models for image classification tasks without
-    writing complex deep-learning code. It integrates seamlessly into KNIME's analytics workflow, providing a
-    user-friendly interface for powerful model training.
-
-
-=======
->>>>>>> 3ab0327439941bbb84537ee3402d41cfb8e1a749
     """
 
     image_column = knext.ColumnParameter(
