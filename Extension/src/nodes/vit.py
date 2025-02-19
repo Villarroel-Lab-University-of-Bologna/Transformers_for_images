@@ -98,6 +98,7 @@ class VisionTransformerLearnerNode:
 
     """
 
+
     image_column = knext.ColumnParameter(
         label="Image Column",
         description="Select an Image column for training.",
@@ -445,7 +446,9 @@ class VisionTransformerPredictor:
     2. The selected transformer model processes the images and makes predictions.
     3. The highest probability class is assigned as the predicted label.
     4. (Optional) Class probability estimates are computed using softmax and included in the output.
+    
     """
+
 
     predictor_settings = ClassificationPredictorGeneralSettings()
 
