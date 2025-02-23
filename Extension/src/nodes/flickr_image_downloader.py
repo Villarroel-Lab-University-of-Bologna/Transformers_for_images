@@ -6,13 +6,13 @@ import logging
 LOGGER = logging.getLogger(__name__)
 
 # Define sub-category
-image_category=knext.category(
-        path="/community/vit_ft",
-        level_id="flickrimg",
-        name="Flickr Image Downloader",
-        description="Node for downloading image URLs from Flickr",
-        icon = "icons/icon.png"
-    )
+image_category = knext.category(
+    path="/community/vit_ft",
+    level_id="flickrimg",
+    name="Flickr Image Downloader",
+    description="Node for downloading image URLs from Flickr",
+    icon="icons/icon.png",
+)
 
 
 @knext.node(
@@ -24,7 +24,7 @@ image_category=knext.category(
 )
 @knext.output_table(
     name="Image URLs",
-    description="Table containing the URLs of the images downloaded from Flickr."
+    description="Table containing the URLs of the images downloaded from Flickr.",
 )
 class FlickrImageDownloader:
     """
@@ -34,16 +34,16 @@ class FlickrImageDownloader:
     credential_param = knext.StringParameter(
         label="Flickr API Key",
         description="Choose one of the connected credentials (Pass key through credential config password field)",
-        choices=lambda a: knext.DialogCreationContext.get_credential_names(a)
+        choices=lambda a: knext.DialogCreationContext.get_credential_names(a),
     )
-    
+
     search_term = knext.StringParameter(
         label="Search Term",
         description="Search term for the images to download.",
         default_value="",
     )
 
-#The maximum nuumber of images that can be downloaded for every page is 500
+    # The maximum nuumber of images that can be downloaded for every page is 500
     no_images = knext.IntParameter(
         label="Number of Images",
         description="Number of images to retrieve from Flickr.",
@@ -52,21 +52,21 @@ class FlickrImageDownloader:
         max_value=20000,
     )
 
-
     def configure(self, ctx: knext.ConfigurationContext):
         if not ctx.get_credential_names():
             raise knext.InvalidParametersError("No credentials provided.")
         if not self.credential_param:
             raise knext.InvalidParametersError("Credentials not selected.")
-        return knext.Schema.from_columns([
-            knext.Column(name="Image URL", ktype=knext.string())
-        ])
-
+        return knext.Schema.from_columns(
+            [knext.Column(name="Image URL", ktype=knext.string())]
+        )
 
     def execute(self, ctx: knext.ExecutionContext):
         # Fetch credentials from KNIME node
         credentials = ctx.get_credentials(self.credential_param)
-        self.api_key = credentials.password  # Use the password field to store the API key
+        self.api_key = (
+            credentials.password
+        )  # Use the password field to store the API key
         base_url = "https://www.flickr.com/services/rest/"
 
         max_per_page = 500  # Flickr's per-page limit
@@ -91,7 +91,9 @@ class FlickrImageDownloader:
             response = requests.get(base_url, params=params)
 
             if response.status_code != 200:
-                raise RuntimeError(f"Failed to fetch data from Flickr API: {response.text}")
+                raise RuntimeError(
+                    f"Failed to fetch data from Flickr API: {response.text}"
+                )
 
             data = response.json()
 
@@ -99,7 +101,7 @@ class FlickrImageDownloader:
                 raise ValueError("Unexpected API response format.")
 
             photo_list = data["photos"]["photo"]
-            
+
             if not photo_list:
                 LOGGER.warning("No more images available. Stopping early.")
                 break  # Stop if no more images available
@@ -107,16 +109,20 @@ class FlickrImageDownloader:
             for photo in photo_list:
                 # Validate metadata
                 if (
-                    "farm" not in photo or photo["farm"] == 0 or
-                    "server" not in photo or not photo["server"] or
-                    "id" not in photo or not photo["id"] or
-                    "secret" not in photo or not photo["secret"]
+                    "farm" not in photo
+                    or photo["farm"] == 0
+                    or "server" not in photo
+                    or not photo["server"]
+                    or "id" not in photo
+                    or not photo["id"]
+                    or "secret" not in photo
+                    or not photo["secret"]
                 ):
                     LOGGER.warning(f"Skipping invalid photo: {photo}")
                     continue  # Skip invalid entries
 
                 photo_url = f"https://farm{photo['farm']}.staticflickr.com/{photo['server']}/{photo['id']}_{photo['secret']}.jpg"
-                
+
                 if photo_url not in urls:  # Prevent duplicates
                     urls.append(photo_url)
 
