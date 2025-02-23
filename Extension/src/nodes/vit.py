@@ -1,4 +1,5 @@
 import knime.extension as knext
+import pandas as pd
 from utils import knutills as kutil
 from utils import modeling_utils as mutil
 import logging
@@ -48,9 +49,13 @@ image_category = knext.category(
     port_type=kutil.classification_model_port_type,
     description="Output containing the trained Vision Transformer model.",
 )
+@knext.output_table(
+    name="Output table",
+    description="Table containing results for each epoch for train and validation.",
+)
 class VisionTransformerLearnerNode:
     """
-    Vision Transformer Learner Node
+    Vision Transformer Learner node
 
     The Vision Transformer Learner node enables users to fine-tune transformer-based models.
     It is a deep learning model that processes image data by dividing it into patches and applying transformer-based
@@ -77,12 +82,6 @@ class VisionTransformerLearnerNode:
       shrinking patch sizes, making it efficient for tasks like object detection and segmentation.
       [More info](https://huggingface.co/docs/transformers/model_doc/pvt)
 
-
-
-    ### Input Requirements:
-    - **Training Data**: A table containing images and corresponding labels for training the model.
-    - **Validation Data**: A table containing images and labels for validating model performance.
-
     ### Configuration Options:
     - **Image Column**: Select the column containing image data (must be in PNG format).
     - **Label Column**: Select the target column containing class labels.
@@ -91,26 +90,12 @@ class VisionTransformerLearnerNode:
     - **Learning Rate**: Sets the optimizer's step size for updating model weights.
     - **Model Choice**: Choose between ViT, Swin Transformer, or Pyramid Transformer.
 
-    ### Output:
-    - **Fine-tuned Model**: A fully fine-tuned transformer model that can be used for inference.
-    - **Training Summary Table**: A table displaying key training statistics:
-    - Epoch count
-    - Training loss
-    - Training accuracy
-    - Validation loss
-    - Validation accuracy
-
     ### How It Works:
     1. The node processes images and encodes labels.
     2. The selected transformer model is initialized and fine-tuned using the provided training data.
     3. A loss function (Cross-Entropy Loss) and optimizer (Adam) are applied to optimize model performance.
     4. Training runs for the specified number of epochs, tracking performance metrics.
     5. The trained model and a performance summary table are returned as outputs.
-
-    This node is ideal for users who want to fine-tune transformer models for image classification tasks without
-    writing complex deep-learning code. It integrates seamlessly into KNIME's analytics workflow, providing a
-    user-friendly interface for powerful model training.
-
 
     """
 
@@ -125,7 +110,7 @@ class VisionTransformerLearnerNode:
         label="Label Column",
         description="Select the column containing class labels.",
         port_index=0,
-        column_filter=kutil.is_nominal,
+        column_filter=kutil.is_numeric_or_string,
     )
 
     num_epochs = knext.IntParameter(
@@ -162,10 +147,25 @@ class VisionTransformerLearnerNode:
         training_schema: knext.Schema,
         validation_schema: knext.Schema,
     ):
-
-        return self._create_spec(
+        model_spec = self._create_spec(
             training_schema, validation_schema, class_probability_schema=None
         )
+
+        # Define schema for output table
+        summary_schema = knext.Schema.from_columns(
+            [
+                knext.Column(knext.int32(), "Epoch"),
+                knext.Column(knext.double(), "Train Loss"),
+                knext.Column(knext.double(), "Train Accuracy"),
+                knext.Column(knext.double(), "Validation Loss"),
+                knext.Column(knext.double(), "Validation Accuracy"),
+            ]
+        )
+
+        return (
+            model_spec,
+            summary_schema,
+        )  # Return the model spec and the schema for the output table
 
     def _create_spec(
         self,
@@ -173,7 +173,6 @@ class VisionTransformerLearnerNode:
         validation_schema: knext.Schema,
         class_probability_schema: knext.Schema,
     ):
-
         image_column = [(c.name, c.ktype) for c in training_schema if kutil.is_png(c)]
 
         # Check if image column have been specified
@@ -322,63 +321,72 @@ class VisionTransformerLearnerNode:
         criterion = torch.nn.CrossEntropyLoss()
         optimizer = Adam(model.parameters(), lr=self.learning_rate)
 
+        # Training loop with table creation
+        training_summary = []
+
         kutil.check_canceled(exec_context)
-        # Training loop with validation
+
         for epoch in range(self.num_epochs):
-            # Training Phase
             model.train()
-            total_loss_train = 0.0
-            total_acc_train = 0
+            total_loss_train, total_acc_train = 0.0, 0
 
-            kutil.check_canceled(exec_context)
-
-            for train_images, train_labels in train_loader:
+            for images, labels in train_loader:
                 optimizer.zero_grad()
-                outputs = model(pixel_values=train_images).logits
-                train_labels = train_labels.to(mutil.device)
-                loss = criterion(outputs, train_labels.long())
-                acc = (outputs.argmax(dim=1) == train_labels).sum().item()
-
+                outputs = model(pixel_values=images).logits
+                labels = labels.to(mutil.device)
+                loss = criterion(outputs, labels.long())
+                acc = (outputs.argmax(dim=1) == labels).sum().item()
                 loss.backward()
-
-                kutil.check_canceled(exec_context)
-
                 optimizer.step()
-
                 total_loss_train += loss.item()
                 total_acc_train += acc
 
+            kutil.check_canceled(exec_context)
             avg_train_loss = total_loss_train / len(train_loader)
-            avg_train_acc = total_acc_train / len(train_dataset)
+            avg_train_acc = total_acc_train / len(df_train)
 
-            exec_context.set_progress(0.6)
-
-            # Validation Phase
             model.eval()
-            total_loss_val = 0.0
-            total_acc_val = 0
+            total_loss_val, total_acc_val = 0.0, 0
 
             with torch.no_grad():
-                for val_images, val_labels in val_loader:
-                    outputs = model(pixel_values=val_images).logits
-                    val_labels = val_labels.to(
+                for images, labels in val_loader:
+                    outputs = model(pixel_values=images).logits
+                    labels = labels.to(
                         mutil.device
                     )  # Convert labels to the correct device
-                    loss = criterion(outputs, val_labels.long())
-                    acc = (outputs.argmax(dim=1) == val_labels).sum().item()
-
+                    loss = criterion(outputs, labels.long())
+                    acc = (outputs.argmax(dim=1) == labels).sum().item()
                     total_loss_val += loss.item()
                     total_acc_val += acc
 
-            exec_context.set_progress(0.8)
-
             avg_val_loss = total_loss_val / len(val_loader)
-            avg_val_acc = total_acc_val / len(val_dataset)
+            avg_val_acc = total_acc_val / len(df_val)
 
-            LOGGER.info(
-                f"Epoch {epoch + 1}/{self.num_epochs} | Train Loss: {avg_train_loss:.3f} | "
-                f"Train Acc: {avg_train_acc:.3f} | Val Loss: {avg_val_loss:.3f} | Val Acc: {avg_val_acc:.3f}"
+            training_summary.append(
+                [epoch + 1, avg_train_loss, avg_train_acc, avg_val_loss, avg_val_acc]
             )
+
+        summary_df = pd.DataFrame(
+            training_summary,
+            columns=[
+                "Epoch",
+                "Train Loss",
+                "Train Accuracy",
+                "Validation Loss",
+                "Validation Accuracy",
+            ],
+        )
+
+        # Force column types to match `configure()`
+        summary_df = summary_df.astype(
+            {
+                "Epoch": "int32",
+                "Train Loss": "float64",
+                "Train Accuracy": "float64",
+                "Validation Loss": "float64",
+                "Validation Accuracy": "float64",
+            }
+        )
 
         trained_model = kutil.ViTClassificationModelObject(
             spec=self._create_spec(
@@ -388,13 +396,12 @@ class VisionTransformerLearnerNode:
             label_enc=label_enc,
         )
 
-        return trained_model
+        return trained_model, knext.Table.from_pandas(summary_df)
 
 
 # General settings for classification predictor node
 @knext.parameter_group(label="Output")
 class ClassificationPredictorGeneralSettings:
-
     prediction_column = knext.StringParameter(
         "Custom prediction column name",
         "If no name is specified for the prediction column, it will default to `<target_column_name>_pred`.",
@@ -438,21 +445,13 @@ class VisionTransformerPredictor:
     """
     Vision Transformer Predictor
 
-
-    The Vision Transformer Predictor Node applies a fine-tuned Transformer model to classify images in the given input dataset.
+    The Vision Transformer Predictor node applies a fine-tuned Transformer model to classify images in the given input dataset.
     It computes the predicted class for each image and, optionally, provides class probability estimates.
 
-    The node requires a fine-tuned Transformer model from the Vision Transformer Learner Node and a dataset containing image data.
+    The node requires a fine-tuned Transformer model from the Vision Transformer Learner node and a dataset containing image data.
     The prediction column name can be customized, and the node supports multiple Transformer architectures.
 
     It is only executable if the test data contains the image column that was used by the learner model.
-
-
-
-    ### Input Requirements:
-
-    - **Trained Model**: A ViT model trained using the ViT Classification Learner node.
-    - **Test Input Data**: A table containing image data for classification.
 
     ### Configuration Options:
 
@@ -460,18 +459,12 @@ class VisionTransformerPredictor:
     - **Predict Probability Estimates**: Enable to obtain confidence scores for each class.
     - **Probability Columns Suffix**: Add a suffix to probability columns for easy identification.
 
-    ### Output:
-
-    - **Predicted Labels Table**: A table containing image predictions with the assigned class label.
-    - **Class Probability Estimates (Optional)**: If enabled, displays confidence scores for each class.
-
     ### How It Works:
 
     1. The node extracts images from the test dataset.
     2. The selected transformer model processes the images and makes predictions.
     3. The highest probability class is assigned as the predicted label.
     4. (Optional) Class probability estimates are computed using softmax and included in the output.
-
 
     """
 
@@ -483,7 +476,6 @@ class VisionTransformerPredictor:
         model_spec: kutil.ViTClassificationModelObjectSpec,
         table_schema: knext.Schema,
     ):
-
         y_pred = kutil.get_prediction_column_name(
             self.predictor_settings.prediction_column, model_spec.target_schema
         )
@@ -573,7 +565,6 @@ class VisionTransformerPredictor:
         df_test[y_pred[0]] = decoded_predictions
 
         if self.predictor_settings.predict_probs:
-
             if self.predictor_settings.prediction_column:
                 # Get original target column name (and not the custom name)
                 # for class probability column names
