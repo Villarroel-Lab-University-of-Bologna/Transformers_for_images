@@ -3,7 +3,7 @@ author: Alberto de Leo
 extension_module: src/my_ext # The .py Python module containing the nodes of your extension
 description: Transformer Model extension # Human readable bundle name / description
 long_description: Pure-Python extension for Vision Transformer Models & Flicker images.
-group_id: edu.luiss
+group_id: edu.unibo # Group ID of the extension
 version: 1.0.0 # Version of this Python node extension
 vendor: KNIME AG, Zurich, Switzerland
 license_file: LICENSE.TXT # Best practice: put your LICENSE.TXT next to the knime.yml; otherwise you would need to change to path/to/LICENSE.txt
