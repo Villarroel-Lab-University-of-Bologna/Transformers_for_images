@@ -7,7 +7,7 @@ LOGGER = logging.getLogger(__name__)
 
 # Define sub-category
 image_category = knext.category(
-    path="/community/vit_ft",
+    path="/community/",
     level_id="flickrimg",
     name="Flickr Image Downloader",
     description="Node for downloading image URLs from Flickr",
@@ -28,7 +28,14 @@ image_category = knext.category(
 )
 class FlickrImageDownloader:
     """
-    Node for downloading images from Flickr using a search term, an API key, and the desired number of images.
+    Flickr Image Downloader 
+
+    It is a KNIME node designed to download image URLs from Flickr based on a search term. 
+    It uses an API key for authentication and allows the user to specify the number of images to retrieve. 
+    The class includes parameters for the API key, search term, and number of images. 
+    It fetches the images in batches, constructs the URLs, and returns them in a table format. 
+    The class also handles configuration and execution within the KNIME environment, ensuring proper credential management and progress reporting.
+
     """
 
     credential_param = knext.StringParameter(
