@@ -50,7 +50,8 @@ image_category = knext.category(
     description="Output containing the trained Vision Transformer model.",
 )
 @knext.output_table(
-    name="Output table", description="Table containing results for each epoch for train and validation."
+    name="Output table",
+    description="Table containing results for each epoch for train and validation.",
 )
 class VisionTransformerLearnerNode:
     """
@@ -97,7 +98,6 @@ class VisionTransformerLearnerNode:
     5. The trained model and a performance summary table are returned as outputs.
 
     """
-
 
     image_column = knext.ColumnParameter(
         label="Image Column",
@@ -147,19 +147,25 @@ class VisionTransformerLearnerNode:
         training_schema: knext.Schema,
         validation_schema: knext.Schema,
     ):
-        model_spec = self._create_spec(training_schema, validation_schema, class_probability_schema=None)
+        model_spec = self._create_spec(
+            training_schema, validation_schema, class_probability_schema=None
+        )
 
         # Define schema for output table
-        summary_schema = knext.Schema.from_columns([
-            knext.Column(knext.int32(), "Epoch"),
-            knext.Column(knext.double(), "Train Loss"),
-            knext.Column(knext.double(), "Train Accuracy"),
-            knext.Column(knext.double(), "Validation Loss"),
-            knext.Column(knext.double(), "Validation Accuracy"),
-        ])
+        summary_schema = knext.Schema.from_columns(
+            [
+                knext.Column(knext.int32(), "Epoch"),
+                knext.Column(knext.double(), "Train Loss"),
+                knext.Column(knext.double(), "Train Accuracy"),
+                knext.Column(knext.double(), "Validation Loss"),
+                knext.Column(knext.double(), "Validation Accuracy"),
+            ]
+        )
 
-        return model_spec, summary_schema # Return the model spec and the schema for the output table
-
+        return (
+            model_spec,
+            summary_schema,
+        )  # Return the model spec and the schema for the output table
 
     def _create_spec(
         self,
@@ -167,7 +173,6 @@ class VisionTransformerLearnerNode:
         validation_schema: knext.Schema,
         class_probability_schema: knext.Schema,
     ):
-
         image_column = [(c.name, c.ktype) for c in training_schema if kutil.is_png(c)]
 
         # Check if image column have been specified
@@ -316,7 +321,6 @@ class VisionTransformerLearnerNode:
         criterion = torch.nn.CrossEntropyLoss()
         optimizer = Adam(model.parameters(), lr=self.learning_rate)
 
-
         # Training loop with table creation
         training_summary = []
 
@@ -325,7 +329,7 @@ class VisionTransformerLearnerNode:
         for epoch in range(self.num_epochs):
             model.train()
             total_loss_train, total_acc_train = 0.0, 0
-            
+
             for images, labels in train_loader:
                 optimizer.zero_grad()
                 outputs = model(pixel_values=images).logits
@@ -336,38 +340,53 @@ class VisionTransformerLearnerNode:
                 optimizer.step()
                 total_loss_train += loss.item()
                 total_acc_train += acc
-            
+
             kutil.check_canceled(exec_context)
             avg_train_loss = total_loss_train / len(train_loader)
             avg_train_acc = total_acc_train / len(df_train)
-            
+
             model.eval()
             total_loss_val, total_acc_val = 0.0, 0
-            
+
             with torch.no_grad():
                 for images, labels in val_loader:
                     outputs = model(pixel_values=images).logits
-                    labels = labels.to(mutil.device)  # Convert labels to the correct device
+                    labels = labels.to(
+                        mutil.device
+                    )  # Convert labels to the correct device
                     loss = criterion(outputs, labels.long())
                     acc = (outputs.argmax(dim=1) == labels).sum().item()
                     total_loss_val += loss.item()
                     total_acc_val += acc
-            
+
             avg_val_loss = total_loss_val / len(val_loader)
             avg_val_acc = total_acc_val / len(df_val)
-            
-            training_summary.append([epoch + 1, avg_train_loss, avg_train_acc, avg_val_loss, avg_val_acc])
 
-        summary_df = pd.DataFrame(training_summary, columns=["Epoch", "Train Loss", "Train Accuracy", "Validation Loss", "Validation Accuracy"])
+            training_summary.append(
+                [epoch + 1, avg_train_loss, avg_train_acc, avg_val_loss, avg_val_acc]
+            )
+
+        summary_df = pd.DataFrame(
+            training_summary,
+            columns=[
+                "Epoch",
+                "Train Loss",
+                "Train Accuracy",
+                "Validation Loss",
+                "Validation Accuracy",
+            ],
+        )
 
         # Force column types to match `configure()`
-        summary_df = summary_df.astype({
-            "Epoch": "int32",
-            "Train Loss": "float64",
-            "Train Accuracy": "float64",
-            "Validation Loss": "float64",
-            "Validation Accuracy": "float64"
-        })
+        summary_df = summary_df.astype(
+            {
+                "Epoch": "int32",
+                "Train Loss": "float64",
+                "Train Accuracy": "float64",
+                "Validation Loss": "float64",
+                "Validation Accuracy": "float64",
+            }
+        )
 
         trained_model = kutil.ViTClassificationModelObject(
             spec=self._create_spec(
@@ -376,13 +395,13 @@ class VisionTransformerLearnerNode:
             model=model,
             label_enc=label_enc,
         )
-        
+
         return trained_model, knext.Table.from_pandas(summary_df)
+
 
 # General settings for classification predictor node
 @knext.parameter_group(label="Output")
 class ClassificationPredictorGeneralSettings:
-
     prediction_column = knext.StringParameter(
         "Custom prediction column name",
         "If no name is specified for the prediction column, it will default to `<target_column_name>_pred`.",
@@ -446,9 +465,8 @@ class VisionTransformerPredictor:
     2. The selected transformer model processes the images and makes predictions.
     3. The highest probability class is assigned as the predicted label.
     4. (Optional) Class probability estimates are computed using softmax and included in the output.
-    
-    """
 
+    """
 
     predictor_settings = ClassificationPredictorGeneralSettings()
 
@@ -458,7 +476,6 @@ class VisionTransformerPredictor:
         model_spec: kutil.ViTClassificationModelObjectSpec,
         table_schema: knext.Schema,
     ):
-
         y_pred = kutil.get_prediction_column_name(
             self.predictor_settings.prediction_column, model_spec.target_schema
         )
@@ -548,7 +565,6 @@ class VisionTransformerPredictor:
         df_test[y_pred[0]] = decoded_predictions
 
         if self.predictor_settings.predict_probs:
-
             if self.predictor_settings.prediction_column:
                 # Get original target column name (and not the custom name)
                 # for class probability column names
