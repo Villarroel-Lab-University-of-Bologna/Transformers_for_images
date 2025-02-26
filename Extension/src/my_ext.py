@@ -9,4 +9,4 @@ main_category = knext.category(
     icon="icons/icon.png",
 )
 
-from nodes import vit
+from nodes import vit, flickr_image_downloader

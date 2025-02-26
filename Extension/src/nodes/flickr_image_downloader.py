@@ -2,6 +2,7 @@ import requests
 import knime.extension as knext
 import pandas as pd
 import logging
+from PIL import Image
 
 LOGGER = logging.getLogger(__name__)
 
@@ -23,7 +24,7 @@ image_category = knext.category(
     id="img-downloader",
 )
 @knext.output_table(
-    name="Image URLs",
+    name="Fetched Images",
     description="Table containing the URLs of the images downloaded from Flickr.",
 )
 class FlickrImageDownloader:
@@ -57,9 +58,7 @@ class FlickrImageDownloader:
             raise knext.InvalidParametersError("No credentials provided.")
         if not self.credential_param:
             raise knext.InvalidParametersError("Credentials not selected.")
-        return knext.Schema.from_columns(
-            [knext.Column(name="Image URL", ktype=knext.string())]
-        )
+        return knext.Column(name="Image", ktype=knext.logical(Image.Image))
 
     def execute(self, ctx: knext.ExecutionContext):
         # Fetch credentials from KNIME node
@@ -134,8 +133,22 @@ class FlickrImageDownloader:
         LOGGER.info(f"Retrieved {len(urls)} unique image URLs from Flickr.")
 
         # Create a DataFrame with the image URLs
-        result_df = pd.DataFrame({"Image URL": urls})
+        result_df = pd.DataFrame()
+        result_df["Image"] = [self.__open_image_from_url(i) for i in urls]
 
         # Report progress
-        ctx.set_progress(1.0, "Image retrieval complete.")
+        ctx.set_progress(0.9, "Image retrieval complete.")
         return knext.Table.from_pandas(result_df)
+
+    def __open_image_from_url(self, url):
+        import io
+
+        response = requests.get(url)
+        if response.status_code == 200:
+            img = Image.open(io.BytesIO(response.content))
+            buffer = io.BytesIO()
+            img.save(buffer, format="PNG")
+            buffer.seek(0)
+            return Image.open(buffer)
+        else:
+            raise ValueError(f"Failed to fetch image from URL: {url}")
