@@ -1,16 +1,14 @@
 name: vision_transformers # Will be concatenated with the group_id to an ID
 author: Alberto de Leo
 extension_module: src/my_ext # The .py Python module containing the nodes of your extension
-description: Transformer Model extension # Human readable bundle name / description
-long_description: Pure-Python extension for Vision Transformer Models & Flicker images.
+description: Vision Transformers extension # Human readable bundle name / description
+long_description: Extension for Vision Transformer Models.
 group_id: edu.unibo # Group ID of the extension
 version: 1.0.0 # Version of this Python node extension
-vendor: KNIME AG, Zurich, Switzerland
+vendor: University of Bologna # Vendor of the extension
 license_file: LICENSE.TXT # Best practice: put your LICENSE.TXT next to the knime.yml; otherwise you would need to change to path/to/LICENSE.txt
 env_yml_path:
   osx-64: bundling/osx-64-mac-intel.yml
   osx-arm64: bundling/osx-arm64-mac-arm.yml # available starting from KNIME Analytics Platform 4.7
   linux-64: bundling/linux-64-dist.yml
   win-64: bundling/win-64-os.yml
-feature_dependencies: 
- - org.knime.features.python3.scripting 5.4.0
