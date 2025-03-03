@@ -1,6 +1,6 @@
 import knime.extension as knext
 import pandas as pd
-from utils import knutills as kutil
+from utils import knutils as kutil
 from utils import modeling_utils as mutil
 import logging
 from transformers import (
@@ -101,7 +101,7 @@ class VisionTransformerLearnerNode:
 
     image_column = knext.ColumnParameter(
         label="Image Column",
-        description="Select an Image column for training.",
+        description="Select an image column for training.",
         port_index=0,
         column_filter=kutil.is_png,
     )
@@ -178,7 +178,7 @@ class VisionTransformerLearnerNode:
         # Check if image column have been specified
         if not image_column:
             raise knext.InvalidParametersError(
-                "PNG image type column in missing in the input table."
+                "PNG image type column is missing in the input table."
             )
 
         # Preset the left most PNG image column from the input table.
@@ -435,11 +435,11 @@ class ClassificationPredictorGeneralSettings:
     description="Input containing the trained Vision Transformer model.",
 )
 @knext.input_table(
-    name="Test Input Data",
-    description="Table containing the test set with image column.",
+    name="Input Data",
+    description="Table containing an image column.",
 )
 @knext.output_table(
-    name="Output table", description="Resulting table with prediction categories."
+    name="Output Data", description="The input table concatenated with a predictions column and optionally class probabilities."
 )
 class VisionTransformerPredictor:
     """
@@ -507,20 +507,18 @@ class VisionTransformerPredictor:
         self,
         exec_context: knext.ExecutionContext,
         model_port: kutil.ViTClassificationModelObject,
-        input_table_1,
+        input_table,
     ):
-        df_test = input_table_1.to_pandas()
+        df = input_table.to_pandas()
 
         # Get list target column for the prediction column
         y_pred = kutil.get_prediction_column_name(
             self.predictor_settings.prediction_column, model_port.spec.target_schema
         )
 
-        image_col = model_port.spec.image_schema.column_names
+        image_col_names_list = model_port.spec.image_schema.column_names # list containing exactly one column name
 
-        features = df_test[image_col]
-
-        images = features[image_col[0]]
+        images = df[image_col_names_list[0]]
 
         model_name = model_port.spec.model_choice
 
@@ -561,8 +559,8 @@ class VisionTransformerPredictor:
             kutil.pd.Series(all_predictions)
         )
 
-        decoded_predictions.index = df_test.index
-        df_test[y_pred[0]] = decoded_predictions
+        decoded_predictions.index = df.index
+        df[y_pred[0]] = decoded_predictions
 
         if self.predictor_settings.predict_probs:
             if self.predictor_settings.prediction_column:
@@ -576,6 +574,6 @@ class VisionTransformerPredictor:
                 y_pred, self.predictor_settings.prob_columns_suffix
             )
             for col, probs in zip(class_probability_names, zip(*all_probabilities)):
-                df_test[col] = probs
+                df[col] = probs
 
-        return knext.Table.from_pandas(df_test)
+        return knext.Table.from_pandas(df)
