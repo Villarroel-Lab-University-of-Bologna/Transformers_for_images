@@ -1,6 +1,6 @@
 from torch.utils.data import Dataset, DataLoader
 import torch
-from . import knutills as kutil
+from . import knutils as kutil
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
