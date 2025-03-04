@@ -5,8 +5,8 @@ channels:
   - pytorch
 dependencies:
   - python=3.11
-  - knime-extension=5.4
-  - knime-python-base=5.4
+  - knime-extension
+  - knime-python-base
   - tokenizers=0.20.1
   - transformers=4.45.2
   - pytorch
