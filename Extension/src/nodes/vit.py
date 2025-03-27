@@ -70,32 +70,32 @@ class VisionTransformerLearnerNode:
     This node supports fine-tuning of three different models' architectures:
 
 
-    - **Vision Transformer (ViT)**: A transformer-based model for image classification that treats images as sequences of
+    -**Vision Transformer (ViT)**: A transformer-based model for image classification that treats images as sequences of
       patches and applies self-attention mechanisms.
       [More info](https://huggingface.co/docs/transformers/model_doc/vit)
 
-    - **Swin Transformer**: A hierarchical transformer model with shifted window attention, designed for high-resolution
+    -**Swin Transformer**: A hierarchical transformer model with shifted window attention, designed for high-resolution
       image classification and dense prediction tasks.
       [More info](https://huggingface.co/docs/transformers/model_doc/swin)
 
-    - **Pyramid Vision Transformer (PVT)**: A transformer model that incorporates a pyramid structure with progressively
+    -**Pyramid Vision Transformer (PVT)**: A transformer model that incorporates a pyramid structure with progressively
       shrinking patch sizes, making it efficient for tasks like object detection and segmentation.
       [More info](https://huggingface.co/docs/transformers/model_doc/pvt)
 
     ### Configuration Options:
-    - **Image Column**: Select the column containing image data (must be in PNG format).
-    - **Label Column**: Select the target column containing class labels.
-    - **Number of Epochs**: Defines the number of iterations over the dataset.
-    - **Batch Size**: Determines the number of images processed in each training step.
-    - **Learning Rate**: Sets the optimizer's step size for updating model weights.
-    - **Model Choice**: Choose between ViT, Swin Transformer, or Pyramid Transformer.
+    -**Image Column**: Select the column containing image data (must be in PNG format).
+    -**Label Column**: Select the target column containing class labels.
+    -**Number of Epochs**: Defines the number of iterations over the dataset.
+    -**Batch Size**: Determines the number of images processed in each training step.
+    -**Learning Rate**: Sets the optimizer's step size for updating model weights.
+    -**Model Choice**: Choose between ViT, Swin Transformer, or Pyramid Transformer.
 
     ### How It Works:
-    1. The node processes images and encodes labels.
-    2. The selected transformer model is initialized and fine-tuned using the provided training data.
-    3. A loss function (Cross-Entropy Loss) and optimizer (Adam) are applied to optimize model performance.
-    4. Training runs for the specified number of epochs, tracking performance metrics.
-    5. The trained model and a performance summary table are returned as outputs.
+    1.The node processes images and encodes labels.
+    2.The selected transformer model is initialized and fine-tuned using the provided training data.
+    3.A loss function (Cross-Entropy Loss) and optimizer (Adam) are applied to optimize model performance.
+    4.Training runs for the specified number of epochs, tracking performance metrics.
+    5.The trained model and a performance summary table are returned as outputs.
 
     """
 
