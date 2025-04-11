@@ -1,7 +1,12 @@
 # KNIME Nodes for Vision Transformers
 [![License: GPL v3](https://img.shields.io/badge/license-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0.html)
 
-This repository provides a KNIME extension for fine-tuning and predicting with Vision Transformer (ViT) models. The nodes are fully developed in Python using PyTorch and HuggingFace Transformers, and can be integrated into your KNIME workflows via the KNIME Analytics Platform.
+This repository provides a KNIME extension for fine-tuning and predicting with Vision Transformer (ViT) models. The nodes are fully developed in Python using PyTorch and HuggingFace Transformers and can be integrated into your KNIME workflows via the KNIME Analytics Platform.
+
+## Installation
+
+### KNIME Analytics Platform
+The extension can be installed via the KNIME Hub by dragging and doping or installed like any other KNIME extension via the KNIME Extension Manager.
 
 ## Features
 
@@ -15,3 +20,4 @@ This repository provides a KNIME extension for fine-tuning and predicting with V
   - Predict labels and class probabilities on new image data.
   - Auto-decodes predictions to original label strings.
   - Customizable output column names and probability formatting.
+
