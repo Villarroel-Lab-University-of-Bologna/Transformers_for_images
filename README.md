@@ -6,7 +6,10 @@ This repository provides a KNIME extension for fine-tuning and predicting with V
 ## Installation
 
 ### KNIME Analytics Platform
-The extension can be installed via the [KNIME Hub](https://hub.knime.com/s/GU3IvjsopdZ8khJS) by dragging and doping or installed like any other KNIME extension via the KNIME Extension Manager.
+The extension can be installed via the [KNIME Hub](https://hub.knime.com/e/FXNeFUXOym7_euUl) by dragging and doping or installed like any other KNIME extension via the KNIME Extension Manager.
+
+### Usage
+Here is an [example of workflow](https://hub.knime.com/s/GU3IvjsopdZ8khJS) that uses the extension.
 
 ## Features
 
