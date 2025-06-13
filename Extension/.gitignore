@@ -2,3 +2,8 @@ __pycache__/
 config_ali.yml
 config.yml
 .gitignore
+local-update-site
+
+# pixi environments
+.pixi
+*.egg-info

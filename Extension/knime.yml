@@ -7,8 +7,4 @@ group_id: edu.unibo # Group ID of the extension
 version: 1.0.0 # Version of this Python node extension
 vendor: University of Bologna # Vendor of the extension
 license_file: LICENSE.TXT # Best practice: put your LICENSE.TXT next to the knime.yml; otherwise you would need to change to path/to/LICENSE.txt
-env_yml_path:
-  osx-64: bundling/osx-64-mac-intel.yml
-  osx-arm64: bundling/osx-arm64-mac-arm.yml # available starting from KNIME Analytics Platform 4.7
-  linux-64: bundling/linux-64-dist.yml
-  win-64: bundling/win-64-os.yml
+pixi_toml_path: pixi.toml
