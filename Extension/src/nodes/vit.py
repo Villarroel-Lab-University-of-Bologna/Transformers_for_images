@@ -12,7 +12,7 @@ from transformers import (
     AutoImageProcessor,
 )
 import torch
-from torch.optim import Adam
+from torch.optim import AdamW
 
 
 LOGGER = logging.getLogger(__name__)
@@ -319,7 +319,7 @@ class VisionTransformerLearnerNode:
         else:
             model.classifier = torch.nn.Linear(model.config.hidden_size, num_classes)
         criterion = torch.nn.CrossEntropyLoss()
-        optimizer = Adam(model.parameters(), lr=self.learning_rate)
+        optimizer = AdamW(model.parameters(), lr=self.learning_rate)
 
         # Training loop with table creation
         training_summary = []
