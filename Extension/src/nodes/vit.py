@@ -69,7 +69,6 @@ class VisionTransformerLearnerNode:
 
     This node supports fine-tuning of three different models' architectures:
 
-
     -**Vision Transformer (ViT)**: A transformer-based model for image classification that treats images as sequences of
       patches and applies self-attention mechanisms.
       [More info](https://huggingface.co/docs/transformers/model_doc/vit)
