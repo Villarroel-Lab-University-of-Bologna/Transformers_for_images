@@ -6,17 +6,17 @@ platforms = ["win-64", "linux-64", "osx-64", "osx-arm64"]
 
 [dependencies]
 python = "3.11.*"
-knime-extension = ">=5.5.0"
-knime-python-base = ">=5.5.0"
+knime-extension = "*"
+knime-python-base = "*"
 tokenizers = "0.20.1.*"
 transformers = "4.45.2.*"
 pytorch-cpu = ">=2.7.0,<3"
-scikit-learn = "1.5.1.*"
+scikit-learn = "1.7.2.*"
 
 
 [feature.build.dependencies]
-python = "3.9.*"
-knime-extension-bundling = "5.*"
+python = "3.11.*"
+knime-extension-bundling = "*"
 
 [feature.build.tasks]
 build = { args = [{ "arg" = "dest", "default" = "./local-update-site" }], cmd = "python ./.pixi/envs/build/bin/build_python_extension.py . {{ dest }}"}
